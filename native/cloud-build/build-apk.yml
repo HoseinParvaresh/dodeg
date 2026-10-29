@@ -1,0 +1,93 @@
+name: Build APK
+
+# ساخت ابری APK — لازم نیست Android Studio نصب باشد.
+# GitHub → تب Actions → «Build APK» → Run workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      tapsell_version:
+        description: 'نسخه‌ی کتابخانه‌ی تپسل (خالی = آخرین نسخه خودکار)'
+        required: false
+        default: ''
+      poolakey_dep:
+        description: 'وابستگی Poolakey مثل ir.cafebazaar:poolakey:2.x.x (خالی = خودکار)'
+        required: false
+        default: ''
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Find library versions
+        id: ver
+        shell: bash
+        run: |
+          set -e
+          TAP="${{ github.event.inputs.tapsell_version }}"
+          if [ -z "$TAP" ]; then
+            TAP=$(curl -fsSL https://repo1.maven.org/maven2/ir/tapsell/tapsell/maven-metadata.xml | grep -oP '(?<=<release>)[^<]+' | head -1 || true)
+          fi
+          if [ -z "$TAP" ]; then echo "::error::نسخه‌ی تپسل پیدا نشد؛ آن را در ورودی tapsell_version بنویسید"; exit 1; fi
+
+          POOL="${{ github.event.inputs.poolakey_dep }}"
+          if [ -z "$POOL" ]; then
+            V=$(curl -fsSL https://repo1.maven.org/maven2/ir/cafebazaar/poolakey/maven-metadata.xml 2>/dev/null | grep -oP '(?<=<release>)[^<]+' | head -1 || true)
+            if [ -n "$V" ]; then POOL="ir.cafebazaar:poolakey:$V"; fi
+          fi
+          if [ -z "$POOL" ]; then
+            T=$(curl -fsSL https://api.github.com/repos/cafebazaar/Poolakey/releases/latest 2>/dev/null | grep -oP '"tag_name":\s*"\K[^"]+' | head -1 || true)
+            if [ -n "$T" ]; then POOL="com.github.cafebazaar.Poolakey:poolakey:$T"; fi
+          fi
+          if [ -z "$POOL" ]; then echo "::error::وابستگی Poolakey پیدا نشد؛ در ورودی poolakey_dep بنویسید"; exit 1; fi
+
+          echo "Tapsell = $TAP"
+          echo "Poolakey = $POOL"
+          echo "tapsell=$TAP" >> "$GITHUB_OUTPUT"
+          echo "poolakey=$POOL" >> "$GITHUB_OUTPUT"
+
+      - name: Install Capacitor (pinned to v7)
+        shell: bash
+        run: |
+          rm -rf node_modules package-lock.json android www
+          npm pkg delete dependencies devDependencies || true
+          npm install @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7
+
+      - name: Create Android project
+        run: |
+          npm run web
+          npx cap add android
+          npm run install-native
+
+      - name: Patch Gradle
+        env:
+          TAPSELL_VERSION: ${{ steps.ver.outputs.tapsell }}
+          POOLAKEY_DEP: ${{ steps.ver.outputs.poolakey }}
+        run: node scripts/patch-gradle.mjs
+
+      - name: Build Bazaar APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleBazaarDebug --stacktrace
+
+      - name: Build Myket APK (only if Myket helper files exist)
+        if: ${{ hashFiles('native/android/myket/util/**') != '' }}
+        working-directory: android
+        run: ./gradlew assembleMyketDebug --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dodge-apk
+          path: android/app/build/outputs/apk/**/*.apk

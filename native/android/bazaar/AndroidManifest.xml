@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- شناسه‌ی تبلیغاتی گوگل برای تپسل (مستند Quick Start) -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
+
+    <!-- دسترسی پرداخت بازار (Poolakey خودش هم اضافه می‌کند؛ تکراری بودنش مشکلی ندارد) -->
+    <uses-permission android:name="com.farsitel.bazaar.permission.PAY_THROUGH_BAZAAR" />
+
+    <!-- اندروید ۱۱ به بالا: اجازه‌ی دیدن اپ بازار -->
+    <queries>
+        <package android:name="com.farsitel.bazaar" />
+    </queries>
+</manifest>

@@ -1,0 +1,6 @@
+{
+  "appId": "ir.hparvaresh.dodge",
+  "appName": "Dodge",
+  "webDir": "www",
+  "server": { "androidScheme": "https" }
+}

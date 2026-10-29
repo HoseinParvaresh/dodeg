@@ -1,0 +1,12 @@
+{
+  "name": "dodge",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "web": "node scripts/copy-web.mjs",
+    "install-native": "node scripts/install-native.mjs",
+    "sync": "node scripts/copy-web.mjs && npx cap sync android",
+    "open": "npx cap open android"
+  }
+}
