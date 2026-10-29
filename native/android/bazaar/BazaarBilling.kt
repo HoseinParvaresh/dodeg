@@ -72,7 +72,7 @@ class BazaarBilling(private val plugin: Plugin) : BillingProvider {
         withConnection(cb) { p ->
             p.purchaseProduct(
                 registry = act.activityResultRegistry,
-                request = PurchaseRequest(productId = sku, requestCode = 7001, payload = payload)
+                   request = PurchaseRequest(productId = sku, payload = payload)
             ) {
                 purchaseFlowBegan { }
                 failedToBeginFlow { t -> cb.fail(mapError(t), t.message ?: "failed to open Bazaar") }
