@@ -95,7 +95,7 @@ html, body {
     align-items: center;
     gap: 8px;
     background: rgba(27, 29, 34, 0.85);
-    backdrop-filter: blur(10px);
+
     border: 1px solid var(--border);
     padding: 8px 14px;
     border-radius: 999px;
@@ -110,7 +110,7 @@ html, body {
     height: 42px;
     border-radius: 50%;
     background: rgba(27, 29, 34, 0.85);
-    backdrop-filter: blur(10px);
+
     border: 1px solid var(--border);
     color: var(--text);
     display: flex;
@@ -321,7 +321,7 @@ html, body {
     height: 54px;
     border-radius: 16px;
     background: rgba(27, 29, 34, 0.85);
-    backdrop-filter: blur(10px);
+
     border: 1px solid rgba(255, 255, 255, 0.1);
     color: var(--text);
     padding: 0 14px;
@@ -367,7 +367,7 @@ html, body {
     height: 60px;
     border-radius: 15px;
     background: rgba(27, 29, 34, 0.85);
-    backdrop-filter: blur(10px);
+
     border: 1px solid var(--border);
     color: var(--text);
     display: flex;
@@ -420,7 +420,7 @@ html, body {
     position: absolute;
     inset: 0;
     background: rgba(12, 13, 16, 0.84);
-    backdrop-filter: blur(12px);
+
     z-index: 30;
     display: flex;
     align-items: center;
@@ -429,7 +429,8 @@ html, body {
     opacity: 1;
     transition: opacity 0.22s ease;
 }
-.modal-backdrop.hidden { opacity: 0; }
+/* مودال بسته: کاملاً از رندر خارج می‌شود (visibility) تا هزینه‌ی ترکیب لایه نداشته باشد */
+.modal-backdrop.hidden { opacity: 0; visibility: hidden; transition: opacity 0.22s ease, visibility 0s linear 0.22s; }
 
 .modal-sheet {
     width: 100%;
@@ -668,26 +669,7 @@ html, body {
 }
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-/* ===================== پرداخت و تبلیغ ===================== */
-.pay-busy {
-    position: absolute; inset: 0; z-index: 80;
-    background: rgba(12, 13, 16, 0.78); backdrop-filter: blur(6px);
-    display: flex; align-items: center; justify-content: center;
-}
-.pay-busy.hidden { display: none; }
-.pay-busy-box {
-    display: flex; flex-direction: column; align-items: center; gap: 12px;
-    padding: 22px 30px; border-radius: 20px; background: var(--surface);
-    border: 1px solid var(--border); color: var(--text);
-    font-family: 'Shabnam', var(--font-sans); font-size: 14px; direction: rtl;
-}
-.pay-spinner {
-    width: 30px; height: 30px; border-radius: 50%;
-    border: 3px solid rgba(255, 255, 255, 0.15); border-top-color: var(--gold);
-    animation: paySpin 0.8s linear infinite;
-}
-@keyframes paySpin { to { transform: rotate(360deg); } }
-
+/* ===================== Ads: continue screen & free-stars popup ===================== */
 /* ---- Continue screen (rewarded ad) — uses the game's own result-modal / button styles ---- */
 #modal-continue { z-index: 40; }
 .cont-ring { position: relative; width: 120px; height: 120px; margin: 10px auto 12px; }
@@ -708,37 +690,13 @@ html, body {
     letter-spacing: 0.8px; text-transform: uppercase; color: var(--text-dim);
 }
 
-/* ---- کارت ستاره‌ی رایگان در فروشگاه ستاره ---- */
-.store-ad-card {
-    display: grid; grid-template-columns: auto 1fr; gap: 10px 12px; align-items: center;
-    padding: 12px; border-radius: 18px; direction: rtl;
-    background: linear-gradient(135deg, rgba(251, 191, 36, 0.16), rgba(27, 29, 34, 0.95) 70%);
-    border: 1px solid rgba(251, 191, 36, 0.4);
+/* ---- Free-stars popup ---- */
+#modal-stars { z-index: 60; }
+.stars-big {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    margin: 10px 0 14px; color: var(--gold);
+    font-family: var(--font-display); font-size: 54px; font-weight: 800; line-height: 1;
 }
-.store-ad-card.claimed { opacity: 0.6; border-color: rgba(255, 255, 255, 0.1); }
-.store-ad-art { display: flex; }
-.store-ad-info h4 { margin: 2px 0 2px; font-size: 15px; color: var(--text); }
-.store-ad-info p { margin: 0; font-size: 12.5px; color: var(--text-dim); line-height: 1.7; }
-.store-ad-info p b { color: var(--gold); }
-.store-ad-badge {
-    display: inline-block; font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 99px;
-    background: rgba(251, 191, 36, 0.16); color: var(--gold); border: 1px solid rgba(251, 191, 36, 0.4);
-}
-.store-ad-btn {
-    grid-column: 1 / -1; height: 42px; border-radius: 13px; border: none; cursor: pointer;
-    background: var(--gold); color: #1B1304; font-size: 14px; font-weight: 800;
-    transition: transform 0.15s ease, opacity 0.2s ease;
-}
-.store-ad-btn:active:not(:disabled) { transform: scale(0.97); }
-.store-ad-btn:disabled { opacity: 0.5; cursor: default; }
-.store-ad-card.claimed .store-ad-btn { background: rgba(255, 255, 255, 0.1); color: var(--text-dim); }
-
-/* پیام‌های فارسی (Toast): بدون فاصله‌ی بین حروف تا چسبیده بمانند */
-#toast.fa {
-    font-family: 'Shabnam', var(--font-sans);
-    letter-spacing: 0;
-    direction: rtl;
-    font-weight: 700;
-    font-size: 13px;
-    white-space: nowrap;
-}
+.stars-big svg { margin-top: 4px; }
+#stars-watch:disabled { opacity: 0.45; cursor: default; }
+#stars-close { width: 100%; }

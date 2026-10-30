@@ -7,10 +7,15 @@ import { Spawner } from './spawner.js';
 import { EntityUpdater } from './updater.js';
 import { ArenaRenderer } from './arenaRenderer.js';
 import { UIManager } from './ui.js';
-import { BillingManager } from './billing.js';
 import { AdsManager } from './ads.js';
 import { ContinueScreen } from './continueScreen.js';
+import { StarsPopup } from './starsPopup.js';
 import { CONTINUE } from './config.js';
+
+// نوشتن در DOM فقط وقتی مقدار واقعاً عوض شده (هر نوشتن، حتی با مقدار یکسان، بازچینی/بازرسم دارد)
+function setText(el, v) { if (el && el.__t !== v) { el.__t = v; el.textContent = v; } }
+function setClass(el, v) { if (el && el.__c !== v) { el.__c = v; el.className = v; } }
+function setStyle(el, prop, v) { const k = '__s_' + prop; if (el && el[k] !== v) { el[k] = v; el.style[prop] = v; } }
 
 export class DodgeGame {
     constructor() {
@@ -19,7 +24,7 @@ export class DodgeGame {
             ['600', '700', '800'].forEach(w => document.fonts.load(`${w} 14px Outfit`).catch(() => { }));
         }
         this.canvas = document.getElementById('game-canvas');
-        this.ctx = this.canvas.getContext('2d');
+        this.ctx = this.canvas.getContext('2d', { alpha: false });
         this.save = SaveStore.load();
         this.audio = new AudioController(this.save.settings);
 
@@ -84,18 +89,35 @@ export class DodgeGame {
         this.pointerP2 = { id: null, active: false, x: 0, y: 0, anchorX: 0, anchorY: 0, lastTap: 0 };
         this.keys = {};
 
+        // کیفیت رندر بوم: روی گوشی‌های ضعیف از ۱٫۵ شروع می‌شود و اگر فریم‌ریت پایین بود خودکار کم می‌شود
+        const maxDpr = Math.min(window.devicePixelRatio || 1, 2);
+        const lowEnd = (navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 8) <= 3;
+        let scale = lowEnd ? Math.min(maxDpr, 1.5) : maxDpr;
+        try {
+            const saved = parseFloat(localStorage.getItem('dodge_render_scale'));
+            if (saved >= 1 && saved < scale) scale = saved;
+        } catch { }
+        this.renderScale = scale;
+        this.lowFx = scale <= 1.25;
+
         this.resize();
         window.addEventListener('resize', () => this.resize());
         this.bindInputs();
         this.ads = new AdsManager(this);
         this.ui = new UIManager(this);
-        this.billing = new BillingManager(this);
         this.continueScreen = new ContinueScreen(this);
+        this.starsPopup = new StarsPopup(this);
         this.applyThemeColors();
         this.ui.refreshHomeUI();
 
         this.lastTime = performance.now();
-        requestAnimationFrame((t) => this.loop(t));
+        this.nextDue = 0;       // زمان‌بندی: حداکثر ۶۰ فریم بر ثانیه (۳۰ در منو)
+        this.dtSmooth = 0;      // dt هموارشده برای جلوگیری از پرش حرکت
+        this._perfAcc = 0;
+        this._perfN = 0;
+        this._perfWarm = 2;     // دو پنجره‌ی اول (شروع بازی) در نظر گرفته نمی‌شود
+        this._raf = (t) => this.loop(t);
+        requestAnimationFrame(this._raf);
     }
 
     createPlayerObj(id, customColor) {
@@ -137,8 +159,28 @@ export class DodgeGame {
         document.documentElement.style.setProperty('--accent', th.laser);
     }
 
+    // فقط اندازه‌ی پیکسلی بوم را عوض می‌کند (بدون دست زدن به محل آرنا یا بازیکن)
+    applyCanvasScale() {
+        const dpr = this.renderScale;
+        this.canvas.width = Math.round(this.width * dpr);
+        this.canvas.height = Math.round(this.height * dpr);
+        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    // اگر میانگین فریم‌تایم بالا بود، یک پله کیفیت بوم کم می‌کنیم (۲ ← ۱٫۵ ← ۱٫۲۵ ← ۱)
+    lowerRenderScale() {
+        const steps = [2, 1.5, 1.25, 1];
+        const next = steps.find(s => s < this.renderScale - 0.01);
+        if (!next) return false;
+        this.renderScale = next;
+        this.lowFx = next <= 1.25;
+        this.applyCanvasScale();
+        try { localStorage.setItem('dodge_render_scale', String(next)); } catch { }
+        return true;
+    }
+
     resize() {
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const dpr = this.renderScale;
         this.width = window.innerWidth;
         this.height = window.innerHeight;
         this.canvas.width = this.width * dpr;
@@ -503,51 +545,54 @@ export class DodgeGame {
     }
 
     updateHUD() {
-        document.getElementById('hud-score').textContent =
-            this.mode === 'VERSUS' ? `${this.p1Wins} - ${this.p2Wins}` : this.score;
-        document.getElementById('ui-stars').textContent = this.save.stars;
+        const el = this._hudEls || (this._hudEls = {
+            score: document.getElementById('hud-score'),
+            stars: document.getElementById('ui-stars'),
+            combo: document.getElementById('hud-combo'),
+            chaos: document.getElementById('hud-chaos'),
+            bar: document.getElementById('hud-progress'),
+            title: document.getElementById('hud-title')
+        });
 
-        const comboEl = document.getElementById('hud-combo');
-        if (comboEl) comboEl.className = 'combo-pill';
+        setText(el.score, this.mode === 'VERSUS' ? `${this.p1Wins} - ${this.p2Wins}` : String(this.score));
+        setText(el.stars, String(this.save.stars));
+        if (el.combo) setClass(el.combo, 'combo-pill');
 
-        const chaosEl = document.getElementById('hud-chaos');
-        if (chaosEl) {
-            if (this.mode === 'CHAOS') chaosEl.textContent = `${this.activeChaosRule.name} (${Math.ceil(this.chaosTimer)}s)`;
-            chaosEl.className = `chaos-pill ${this.mode === 'CHAOS' ? 'active' : ''}`;
+        if (el.chaos) {
+            if (this.mode === 'CHAOS') setText(el.chaos, `${this.activeChaosRule.name} (${Math.ceil(this.chaosTimer)}s)`);
+            setClass(el.chaos, `chaos-pill ${this.mode === 'CHAOS' ? 'active' : ''}`);
         }
 
-        const bar = document.getElementById('hud-progress');
         if (this.mode === 'LEVEL') {
             const chap = CHAPTERS.find(c => this.currentLevelId >= c.range[0] && this.currentLevelId <= c.range[1]) || CHAPTERS[0];
-            bar.style.width = `${Math.min(100, (this.score / this.targetScore) * 100)}%`;
-            bar.style.background = 'var(--text)';
-            document.getElementById('hud-title').textContent = `LEVEL ${this.currentLevelId} • CH.${chap.id}`;
+            setStyle(el.bar, 'width', `${Math.min(100, (this.score / this.targetScore) * 100)}%`);
+            setStyle(el.bar, 'background', 'var(--text)');
+            setText(el.title, `LEVEL ${this.currentLevelId} • CH.${chap.id}`);
         } else if (this.mode === 'OVERDRIVE') {
-            bar.style.width = `${clamp((this.overdriveTimer / this.overdriveMaxTime) * 100, 0, 100)}%`;
-            bar.style.background = this.overdriveTimer < 4 ? 'var(--accent)' : 'var(--blue)';
-            document.getElementById('hud-title').textContent = `OVERDRIVE • ${this.overdriveTimer.toFixed(1)}s`;
+            setStyle(el.bar, 'width', `${clamp((this.overdriveTimer / this.overdriveMaxTime) * 100, 0, 100)}%`);
+            setStyle(el.bar, 'background', this.overdriveTimer < 4 ? 'var(--accent)' : 'var(--blue)');
+            setText(el.title, `OVERDRIVE • ${this.overdriveTimer.toFixed(1)}s`);
         } else if (this.mode === 'CHAOS') {
-            bar.style.width = `${clamp((this.chaosTimer / 15.0) * 100, 0, 100)}%`;
-            bar.style.background = 'var(--purple)';
-            document.getElementById('hud-title').textContent = 'CHAOS ARENA';
+            setStyle(el.bar, 'width', `${clamp((this.chaosTimer / 15.0) * 100, 0, 100)}%`);
+            setStyle(el.bar, 'background', 'var(--purple)');
+            setText(el.title, 'CHAOS ARENA');
         } else if (this.mode === 'VERSUS') {
-            document.getElementById('hud-title').textContent =
-                `ROUND ${this.currentRound} • P1 [ ${this.p1Wins} - ${this.p2Wins} ] P2 (FIRST TO 3)`;
+            setText(el.title, `ROUND ${this.currentRound} • P1 [ ${this.p1Wins} - ${this.p2Wins} ] P2 (FIRST TO 3)`);
         } else {
-            document.getElementById('hud-title').textContent = 'ENDLESS ARENA';
+            setText(el.title, 'ENDLESS ARENA');
         }
     }
 
     showToast(msg) {
         const el = document.getElementById('toast');
         el.textContent = msg;
-        el.classList.toggle('fa', /[\u0600-\u06FF]/.test(msg));
         el.classList.add('show');
         clearTimeout(this.toastTimeout);
         this.toastTimeout = setTimeout(() => el.classList.remove('show'), 1150);
     }
 
     emitParticles(x, y, color, count = 12) {
+        if (this.lowFx) count = Math.max(2, Math.ceil(count * 0.55));
         for (let i = 0; i < count; i++) {
             const a = rand(0, Math.PI * 2), s = rand(40, 180);
             this.particles.push({
@@ -680,8 +725,7 @@ export class DodgeGame {
         } else if (outcome === 'WIN') {
             this.audio.playWin();
             this.triggerFinishFX(this.player.x, this.player.y);
-            const vipMult = this.save.vipDoubler ? 2 : 1;
-            const bonus = (4 + Math.floor(this.currentLevelId * 0.7)) * vipMult;
+            const bonus = 4 + Math.floor(this.currentLevelId * 0.7);
             this.save.stars += bonus;
             if (!this.shieldLostThisRun) this.save.stats.noHitWins = (this.save.stats.noHitWins || 0) + 1;
             if (this.runElapsedTime < 14.0) this.save.stats.fastWins = (this.save.stats.fastWins || 0) + 1;
@@ -694,7 +738,7 @@ export class DodgeGame {
             tag.textContent = 'COMPLETED';
             tag.className = 'result-tag win';
             heading.textContent = `LEVEL ${this.currentLevelId}`;
-            subEl.textContent = `Level Bonus: +${bonus} ★ ${this.save.vipDoubler ? '(2x VIP)' : ''}`;
+            subEl.textContent = `Level Bonus: +${bonus} ★`;
             btnText.textContent = this.currentLevelId < LEVELS.length ? `NEXT: LEVEL ${this.currentLevelId + 1}` : 'PLAY AGAIN';
         } else {
             this.audio.playFail();
@@ -1030,11 +1074,36 @@ export class DodgeGame {
     }
 
     loop(now) {
-        const dt = Math.min(0.05, (now - this.lastTime) / 1000);
+        requestAnimationFrame(this._raf);
+
+        // ۱) سقف فریم‌ریت: روی صفحه‌های ۹۰/۱۲۰ هرتز هم بیشتر از ~۶۰ فریم رسم نمی‌کنیم (منو: ۳۰)
+        const frameMs = this.state === 'MENU' ? 33.2 : 16.0;
+        if (now + 1.5 < this.nextDue) return;
+        this.nextDue += frameMs;
+        if (this.nextDue < now - frameMs) this.nextDue = now;
+
+        const rawMs = now - this.lastTime;
         this.lastTime = now;
-        this.update(dt);
+
+        // ۲) dt: پرش‌های بزرگ (GC، برگشت از پس‌زمینه) بریده و نوسان‌های کوچک هموار می‌شود
+        const dt = Math.min(rawMs / 1000, 1 / 30);
+        if (this.dtSmooth === 0 || Math.abs(dt - this.dtSmooth) > this.dtSmooth) this.dtSmooth = dt;
+        else this.dtSmooth += (dt - this.dtSmooth) * 0.25;
+
+        this.update(this.dtSmooth);
         ArenaRenderer.draw(this);
-        requestAnimationFrame((t) => this.loop(t));
+
+        // ۳) کیفیت تطبیقی: اگر در حین بازی میانگین فریم‌تایم از ~۲۲ms بیشتر بود، رزولوشن بوم کم می‌شود
+        if (this.state !== 'MENU' && this.state !== 'PAUSED' && rawMs < 250) {
+            this._perfAcc += rawMs;
+            if (++this._perfN >= 45) {
+                const avg = this._perfAcc / this._perfN;
+                this._perfAcc = 0;
+                this._perfN = 0;
+                if (this._perfWarm > 0) this._perfWarm--;
+                else if (avg > 22 && this.lowerRenderScale()) this._perfWarm = 2;
+            }
+        }
     }
 }
 

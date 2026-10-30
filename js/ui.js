@@ -1,235 +1,20 @@
 import { CHAPTERS, CHAPTER_INTROS, DASH_TUTORIAL, LEVELS, ACHIEVEMENTS } from './levels.js';
-import { STAR_PACKS, STAR_PACK_ART, SHOP_DATA, SHAPE_SVGS, FX_SVGS } from './shop.js';
+import { SHOP_DATA, SHAPE_SVGS, FX_SVGS } from './shop.js';
 import { SaveStore } from './storage.js';
-import { SHOP_REWARD_AD } from './config.js';
 
 export class UIManager {
     constructor(game) {
         this.game = game;
         this.activeShopTab = 'shapes';
         this.introQueue = [];
-        this.injectStarStorePersianStyles();
         this.setupModesModalAndButton();
         this.setupFourthShopTab();
-        this.ensureStarStoreModal();
         this.ensureChapterIntroModal();
         this.upgradeTopBarStarPill();
         this.bindUI();
 
         const hintEl = document.getElementById('hud-dash-hint');
         if (hintEl) hintEl.textContent = 'DOUBLE-TAP SCREEN TO DASH';
-    }
-
-    injectStarStorePersianStyles() {
-        if (!document.getElementById('star-store-persian-style')) {
-            const style = document.createElement('style');
-            style.id = 'star-store-persian-style';
-            style.textContent = `
-                @keyframes floatArt {
-                    0%, 100% { transform: translateY(0px) scale(1); }
-                    50% { transform: translateY(-4px) scale(1.03); }
-                }
-                @keyframes shineSweep {
-                    0% { transform: translateX(120%) skewX(-20deg); }
-                    35%, 100% { transform: translateX(-180%) skewX(-20deg); }
-                }
-                #modal-star-store,
-                #modal-star-store * {
-                    font-family: 'Shabnam', var(--font-sans) !important;
-                }
-                #modal-star-store .modal-sheet {
-                    direction: rtl;
-                    background: linear-gradient(180deg, #1E2028 0%, #14161B 100%);
-                    border: 1px solid rgba(251, 191, 36, 0.22);
-                    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75);
-                }
-                #modal-star-store .modal-title {
-                    font-size: 20px !important;
-                    font-weight: 700 !important;
-                    letter-spacing: 0 !important;
-                    background: linear-gradient(90deg, #FFFBEB, #FBBF24);
-                    -webkit-background-clip: text;
-                    -webkit-text-fill-color: transparent;
-                }
-                .store-section-label {
-                    font-size: 12.5px;
-                    font-weight: 700;
-                    color: #9CA3AF;
-                    padding: 2px 4px 0;
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                }
-                .store-section-label::after {
-                    content: '';
-                    flex: 1;
-                    height: 1px;
-                    background: rgba(255, 255, 255, 0.08);
-                }
-                .store-hero-card {
-                    position: relative;
-                    border-radius: 20px;
-                    padding: 14px;
-                    border: 1.5px solid rgba(255, 255, 255, 0.14);
-                    display: flex;
-                    flex-direction: column;
-                    gap: 12px;
-                    overflow: hidden;
-                    flex-shrink: 0;
-                    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.35);
-                }
-                .store-hero-card::before {
-                    content: '';
-                    position: absolute;
-                    top: 0; bottom: 0; width: 45%;
-                    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
-                    animation: shineSweep 4.5s infinite;
-                    pointer-events: none;
-                }
-                .store-hero-top {
-                    display: flex;
-                    align-items: center;
-                    gap: 14px;
-                }
-                .store-art-box {
-                    width: 78px;
-                    height: 78px;
-                    border-radius: 18px;
-                    background: rgba(12, 13, 16, 0.65);
-                    border: 1px solid rgba(255, 255, 255, 0.1);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    flex-shrink: 0;
-                    position: relative;
-                }
-                .store-art-box svg,
-                .store-grid-art svg {
-                    animation: floatArt 3.2s ease-in-out infinite;
-                    filter: drop-shadow(0 6px 12px rgba(0,0,0,0.45));
-                }
-                .store-hero-info {
-                    flex: 1;
-                    min-width: 0;
-                    text-align: right;
-                }
-                .store-ribbon-badge {
-                    display: inline-block;
-                    font-size: 11px;
-                    font-weight: 700;
-                    padding: 3px 10px;
-                    border-radius: 99px;
-                    margin-bottom: 5px;
-                }
-                .store-hero-info h4 {
-                    font-size: 17px;
-                    font-weight: 700;
-                    color: #FFFFFF;
-                    margin-bottom: 4px;
-                }
-                .store-hero-info p {
-                    font-size: 13px;
-                    font-weight: 400;
-                    color: #D1D5DB;
-                    line-height: 1.55;
-                }
-                .store-hero-bottom {
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    background: rgba(12, 13, 16, 0.55);
-                    padding: 8px 12px;
-                    border-radius: 14px;
-                    border: 1px solid rgba(255, 255, 255, 0.06);
-                }
-                .store-packs-grid {
-                    display: grid;
-                    grid-template-columns: repeat(2, 1fr);
-                    gap: 10px;
-                    width: 100%;
-                    flex-shrink: 0;
-                }
-                .store-grid-card {
-                    position: relative;
-                    border-radius: 20px;
-                    padding: 14px 10px 12px;
-                    border: 1.5px solid rgba(255, 255, 255, 0.1);
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    text-align: center;
-                    justify-content: space-between;
-                    gap: 6px;
-                    overflow: hidden;
-                    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
-                }
-                .store-grid-badge {
-                    position: absolute;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    font-size: 10.5px;
-                    font-weight: 700;
-                    padding: 3px 6px;
-                    text-align: center;
-                }
-                .store-grid-art {
-                    height: 72px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    margin-top: 10px;
-                }
-                .store-grid-amount {
-                    font-size: 19px;
-                    font-weight: 700;
-                    color: #FBBF24;
-                    line-height: 1.1;
-                    text-shadow: 0 2px 10px rgba(251, 191, 36, 0.35);
-                }
-                .store-grid-name {
-                    font-size: 15px;
-                    font-weight: 700;
-                    color: #F3F4F6;
-                }
-                .store-grid-bonus {
-                    font-size: 11.5px;
-                    font-weight: 500;
-                    padding: 2px 8px;
-                    border-radius: 6px;
-                    background: rgba(255, 255, 255, 0.07);
-                    color: #E5E7EB;
-                    margin-bottom: 4px;
-                }
-                .store-buy-btn {
-                    width: 100%;
-                    height: 40px;
-                    border-radius: 12px;
-                    border: none;
-                    font-size: 13.5px;
-                    font-weight: 700;
-                    cursor: pointer;
-                    background: linear-gradient(180deg, #FDE047 0%, #F59E0B 100%);
-                    color: #121316;
-                    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
-                    transition: transform 0.12s ease;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                }
-                .store-buy-btn:active {
-                    transform: scale(0.95);
-                }
-                .store-buy-btn.purchased {
-                    background: rgba(52, 211, 153, 0.18);
-                    color: #34D399;
-                    border: 1px solid rgba(52, 211, 153, 0.4);
-                    box-shadow: none;
-                    cursor: default;
-                }
-            `;
-            document.head.appendChild(style);
-        }
     }
 
     setupFourthShopTab() {
@@ -261,211 +46,27 @@ export class UIManager {
                 if (this.game.state === 'PLAYING') return;
                 this.game.audio.init();
                 this.game.audio.playTap();
-                this.openStarStoreModal();
+                this.openGetStars(false);
             });
         }
 
         ['btn-gift-stars', 'btn-gift-stars-perks'].forEach(id => {
             const btn = document.getElementById(id);
             if (btn) {
-                btn.innerHTML = '+ BUY ★';
+                btn.innerHTML = '+ GET ★';
                 btn.style.cssText = 'font-size:11px;padding:6px 10px;min-width:auto;background:var(--gold);color:#121316;';
             }
         });
     }
 
-    ensureStarStoreModal() {
-        if (document.getElementById('modal-star-store')) return;
-        const modal = document.createElement('div');
-        modal.id = 'modal-star-store';
-        modal.className = 'modal-backdrop hidden interactive';
-        modal.style.zIndex = '50';
-        modal.innerHTML = `
-            <div class="modal-sheet" style="max-width: 430px; padding: 18px;">
-                <div class="modal-header" style="margin-bottom: 12px;">
-                    <div style="display:flex;align-items:center;gap:8px;">
-                        <svg class="icon-svg" style="width:24px;height:24px;color:var(--gold);fill:var(--gold);" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                        <span class="modal-title">فروشگاه ستاره</span>
-                    </div>
-                    <div style="display:flex;align-items:center;gap:8px;">
-                        <div style="display:flex;align-items:center;gap:5px;background:var(--bg);border:1px solid rgba(251,191,36,0.3);padding:5px 11px;border-radius:99px;font-weight:700;font-size:13.5px;color:var(--gold);direction:ltr;">
-                            <span>★</span>
-                            <span id="store-header-stars">0</span>
-                        </div>
-                        <button class="icon-btn" id="btn-close-star-store" style="width:36px;height:36px;">
-                            <svg class="icon-svg" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                        </button>
-                    </div>
-                </div>
-                <div class="modal-scroll" id="star-packs-container" style="gap:12px;"></div>
-            </div>
-        `;
-        document.getElementById('app').appendChild(modal);
-
-        document.getElementById('btn-close-star-store').addEventListener('click', () => {
-            this.game.audio.init();
-            this.game.audio.playTap();
-            modal.classList.add('hidden');
-        });
-    }
-
-    openStarStoreModal() {
-        this.renderStarStoreModal();
-        document.getElementById('modal-star-store')?.classList.remove('hidden');
-    }
-
-    renderStarStoreModal(justBoughtId = null) {
+    // پاپ‌آپ «ستاره‌ی رایگان با تبلیغ». notEnough=true یعنی بازیکن به چیزی زده که ستاره‌اش را ندارد
+    openGetStars(notEnough = true) {
         const g = this.game;
-        const container = document.getElementById('star-packs-container');
-        if (!container) return;
-        const prevScroll = container.scrollTop;
-        container.innerHTML = '';
-
-        const headerStars = document.getElementById('store-header-stars');
-        if (headerStars) headerStars.textContent = g.save.stars.toLocaleString();
-
-        this.renderShopRewardCard(container);
-
-        const heroLabel = document.createElement('div');
-        heroLabel.className = 'store-section-label';
-        heroLabel.innerHTML = `<span>🔥 پیشنهادهای استثنایی</span>`;
-        container.appendChild(heroLabel);
-
-        const heroPacks = STAR_PACKS.filter(p => p.isHero);
-        heroPacks.forEach(pack => {
-            const isBought =
-                (pack.id === 'starter_bundle' && g.save.starterPackBought) ||
-                (pack.id === 'vip_doubler' && g.save.vipDoubler);
-
-            const card = document.createElement('div');
-            card.className = `store-hero-card ${justBoughtId === pack.id ? 'level-up-anim' : ''}`;
-            card.style.background = pack.bgGrad;
-            card.style.borderColor = `${pack.color}66`;
-
-            card.innerHTML = `
-                <div class="store-hero-top">
-                    <div class="store-art-box" style="border-color:${pack.color}55; box-shadow: inset 0 0 18px ${pack.color}22;">
-                        ${STAR_PACK_ART[pack.id] || ''}
-                    </div>
-                    <div class="store-hero-info">
-                        <span class="store-ribbon-badge" style="background:${pack.color}28;color:${pack.color};border:1px solid ${pack.color}66;">
-                            ${pack.badge}
-                        </span>
-                        <h4>${pack.name}</h4>
-                        <p>${pack.desc}</p>
-                    </div>
-                </div>
-                <div class="store-hero-bottom">
-                    <div>
-                        <div style="font-size:16px;font-weight:700;color:var(--gold);">
-                            +${pack.stars.toLocaleString()} ★
-                        </div>
-                        <div style="font-size:11.5px;font-weight:700;color:${pack.color};">
-                            ${pack.bonusText}
-                        </div>
-                    </div>
-                    <button class="store-buy-btn ${isBought ? 'purchased' : ''}" ${isBought ? 'disabled' : ''} style="width:auto;min-width:132px;padding:0 16px;">
-                        ${isBought ? 'فعال شده ✓' : g.billing.priceFor(pack)}
-                    </button>
-                </div>
-            `;
-
-            card.querySelector('button').onclick = () => {
-                if (isBought) return;
-                g.audio.init();
-                g.billing.initiatePurchase(pack.sku);
-            };
-            container.appendChild(card);
-        });
-
-        const gridLabel = document.createElement('div');
-        gridLabel.className = 'store-section-label';
-        gridLabel.style.marginTop = '4px';
-        gridLabel.innerHTML = `<span>💎 بسته‌های ستاره</span>`;
-        container.appendChild(gridLabel);
-
-        const gridWrap = document.createElement('div');
-        gridWrap.className = 'store-packs-grid';
-
-        const standardPacks = STAR_PACKS.filter(p => !p.isHero);
-        standardPacks.forEach(pack => {
-            const card = document.createElement('div');
-            card.className = `store-grid-card ${justBoughtId === pack.id ? 'level-up-anim' : ''}`;
-            card.style.background = pack.bgGrad;
-            card.style.borderColor = `${pack.color}55`;
-
-            card.innerHTML = `
-                ${pack.badge
-                    ? `<div class="store-grid-badge" style="background:${pack.color};color:#121316;">${pack.badge}</div>`
-                    : `<div style="height:14px;"></div>`
-                }
-                <div class="store-grid-art">
-                    ${STAR_PACK_ART[pack.id] || ''}
-                </div>
-                <div class="store-grid-amount">${pack.stars.toLocaleString()} ★</div>
-                <div class="store-grid-name">${pack.name}</div>
-                <div class="store-grid-bonus" style="color:${pack.color};border:1px solid ${pack.color}44;">
-                    ${pack.bonusText}
-                </div>
-                <button class="store-buy-btn">
-                    ${g.billing.priceFor(pack)}
-                </button>
-            `;
-
-            card.querySelector('button').onclick = () => {
-                g.audio.init();
-                g.billing.initiatePurchase(pack.sku);
-            };
-            gridWrap.appendChild(card);
-        });
-
-        container.appendChild(gridWrap);
-        container.scrollTop = prevScroll;
-    }
-
-    // کارت «ستاره‌ی رایگان با تماشای تبلیغ» — یک‌بار برای هر بازیکن
-    renderShopRewardCard(container) {
-        const g = this.game;
-        const claimed = g.ads.isShopRewardClaimed();
-        if (!claimed && !g.ads.supported) return;     // نسخه‌ی وب: تبلیغی در کار نیست
-
-        const ready = g.ads.isReady('shopReward');
-        const busy = g.ads.busy;
-        const amount = SHOP_REWARD_AD.stars.toLocaleString('fa-IR');
-        const label = claimed ? 'دریافت شد ✓'
-            : busy ? 'در حال نمایش…'
-            : ready ? 'تماشای تبلیغ' : 'در حال آماده‌سازی…';
-
-        const card = document.createElement('div');
-        card.className = `store-ad-card ${claimed ? 'claimed' : ''}`;
-        card.innerHTML = `
-            <div class="store-ad-art">
-                <svg viewBox="0 0 48 48" width="46" height="46" fill="none">
-                    <circle cx="24" cy="24" r="20" fill="rgba(251,191,36,0.14)" stroke="#FBBF24" stroke-width="1.6" stroke-dasharray="4 3"/>
-                    <polygon points="24,9 28,19 39,20 31,27 33,38 24,32 15,38 17,27 9,20 20,19" fill="#FBBF24"/>
-                    <polygon points="20,21 20,31 30,26" fill="#14161B"/>
-                </svg>
-            </div>
-            <div class="store-ad-info">
-                <span class="store-ad-badge">فقط یک‌بار</span>
-                <h4>ستاره‌ی رایگان</h4>
-                <p>یه تبلیغ کوتاه ببین و <b>${amount} ★</b> هدیه بگیر</p>
-            </div>
-            <button class="store-ad-btn" ${claimed || !ready || busy ? 'disabled' : ''}>${label}</button>
-        `;
-        const btn = card.querySelector('button');
-        btn.onclick = async () => {
-            if (btn.disabled) return;
-            g.audio.init();
-            btn.disabled = true;
-            await g.ads.claimShopReward();
-            this.renderStarStoreModal();
-        };
-        container.appendChild(card);
+        if (g.ads.supported) g.starsPopup.open({ notEnough });
+        else g.showToast(notEnough ? 'NOT ENOUGH ★' : 'AVAILABLE IN THE ANDROID APP');
     }
 
     onAdsStateChanged() {
-        this._refreshStoreIfOpen();
         this.refreshUnlockAllButton();
     }
 
@@ -481,12 +82,6 @@ export class UIManager {
         btn.style.opacity = ready ? '' : '0.5';
         btn.textContent = 'UNLOCK ALL ▶';
         btn.title = g.ads.supported ? 'Watch a short ad to unlock every level' : '';
-    }
-    onStoreDataChanged() { this._refreshStoreIfOpen(); }
-
-    _refreshStoreIfOpen() {
-        const m = document.getElementById('modal-star-store');
-        if (m && !m.classList.contains('hidden')) this.renderStarStoreModal();
     }
 
     setupModesModalAndButton() {
@@ -692,8 +287,8 @@ export class UIManager {
         });
         tap('btn-close-perks', () => document.getElementById('modal-perks').classList.add('hidden'));
 
-        tap('btn-gift-stars-perks', () => this.openStarStoreModal());
-        tap('btn-gift-stars', () => this.openStarStoreModal());
+        tap('btn-gift-stars-perks', () => this.openGetStars(false));
+        tap('btn-gift-stars', () => this.openGetStars(false));
 
         tap('btn-open-shop', () => {
             this.renderShopTab();
@@ -930,7 +525,7 @@ export class UIManager {
                 if (maxed) return;
                 if (g.save.stars < cost) {
                     g.audio.playTap();
-                    this.openStarStoreModal();
+                    this.openGetStars(true);
                     return;
                 }
                 g.audio.playUpgrade();
@@ -1010,7 +605,7 @@ export class UIManager {
                     g.showToast(`${item.name.toUpperCase()} UNLOCKED!`);
                 } else {
                     g.audio.playTap();
-                    this.openStarStoreModal();
+                    this.openGetStars(true);
                     return;
                 }
                 SaveStore.save(g.save);

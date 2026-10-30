@@ -17,10 +17,6 @@ export class SaveStore {
             unlockedThemes: ['coral'],
             fx: 'classic',
             unlockedFx: ['classic'],
-            starterPackBought: false,
-            vipDoubler: false,
-            purchaseHistory: [],
-            adShopRewardClaimed: false,
             perks: { shield: 0, magnet: 0, slow: 0, greed: 0, secondwind: 0, closecall: 0 },
             stats: {
                 noHitWins: 0,

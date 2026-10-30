@@ -1,4 +1,4 @@
-import { ADS, SHOP_REWARD_AD } from './config.js';
+import { ADS, STAR_AD } from './config.js';
 import { Platform } from './platform.js';
 import { SaveStore } from './storage.js';
 import { LEVELS } from './levels.js';
@@ -10,7 +10,7 @@ import { LEVELS } from './levels.js';
 //
 // نتیجه‌ی show():  { status: 'REWARDED' | 'CLOSED' | 'ERROR' | 'NOT_READY' | 'BUSY' | 'UNSUPPORTED' }
 
-const PLACEMENTS = ['continue', 'shopReward', 'unlockAll'];
+const PLACEMENTS = ['continue', 'stars', 'unlockAll'];
 
 export class AdsManager {
     constructor(game) {
@@ -48,7 +48,6 @@ export class AdsManager {
 
     // آیا این placement الان به تبلیغ آماده نیاز دارد؟
     _wanted(p) {
-        if (p === 'shopReward') return !this.isShopRewardClaimed();
         if (p === 'unlockAll') return !this.isAllUnlocked();
         return true;
     }
@@ -132,8 +131,6 @@ export class AdsManager {
 
     /* ---------------- پاداش یک‌بارمصرف فروشگاه ---------------- */
 
-    isShopRewardClaimed() { return !!this.game.save.adShopRewardClaimed; }
-
     isAllUnlocked() { return this.game.save.unlockedLevel >= LEVELS.length; }
 
     /* ---------------- باز کردن همه‌ی مراحل با تبلیغ ---------------- */
@@ -143,7 +140,7 @@ export class AdsManager {
         const g = this.game;
         if (this.isAllUnlocked()) return { status: 'CLAIMED' };
         if (!this.supported) {
-            g.showToast('باز کردن همه‌ی مراحل در نسخه‌ی اندروید با دیدن تبلیغ فعال می‌شود');
+            g.showToast('AVAILABLE IN THE ANDROID APP');
             return { status: 'UNSUPPORTED' };
         }
 
@@ -155,14 +152,14 @@ export class AdsManager {
                 SaveStore.save(g.save);
                 g.audio.playWin();
                 g.audio.vibrate([30, 50, 40]);
-                g.showToast('همه‌ی مراحل باز شد ✓');
+                g.showToast('ALL LEVELS UNLOCKED');
             }
         } else if (res.status === 'CLOSED') {
-            g.showToast('تبلیغ کامل دیده نشد؛ مراحل باز نشد');
+            g.showToast('WATCH THE FULL AD TO UNLOCK');
         } else if (res.status === 'NOT_READY' || res.status === 'BUSY') {
-            g.showToast('تبلیغی هنوز آماده نیست؛ چند لحظه‌ی دیگر دوباره امتحان کن');
+            g.showToast('AD NOT READY YET - TRY AGAIN IN A MOMENT');
         } else {
-            g.showToast('نمایش تبلیغ ناموفق بود؛ بعداً دوباره امتحان کن');
+            g.showToast('AD FAILED - TRY AGAIN LATER');
         }
         return res;
     }
@@ -189,9 +186,29 @@ export class AdsManager {
         } else if (res.status === 'CLOSED') {
             g.showToast('تبلیغ کامل دیده نشد؛ پاداشی داده نشد');
         } else if (res.status === 'NOT_READY' || res.status === 'BUSY') {
-            g.showToast('تبلیغی هنوز آماده نیست؛ چند لحظه‌ی دیگر دوباره امتحان کن');
+            g.showToast('AD NOT READY YET - TRY AGAIN IN A MOMENT');
         } else {
-            g.showToast('نمایش تبلیغ ناموفق بود؛ بعداً دوباره امتحان کن');
+            g.showToast('AD FAILED - TRY AGAIN LATER');
+        }
+        return res;
+    }
+
+    /* ---------------- ستاره‌ی رایگان با تبلیغ (تکرارپذیر) ---------------- */
+
+    // نتیجه: همان status های show()
+    async claimStars() {
+        const g = this.game;
+        if (!this.supported) return { status: 'UNSUPPORTED' };
+
+        const res = await this.show('stars');
+        if (res.status === 'REWARDED') {
+            g.save.stars += STAR_AD.stars;
+            SaveStore.save(g.save);
+            g.audio.playWin();
+            g.audio.vibrate([30, 50, 40]);
+            g.showToast(`+${STAR_AD.stars} ★`);
+            g.ui.refreshHomeUI();
+            if (g.state !== 'MENU') g.updateHUD();
         }
         return res;
     }
