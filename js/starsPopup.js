@@ -73,26 +73,37 @@ export class StarsPopup {
 
     _render() {
         const ads = this.game.ads;
-        let state;
-        if (this.phase === 'AD') state = 'playing';
-        else if (ads.isReady('stars')) state = 'ready';
-        else state = 'loading';
-        if (state === this._btnState) return;
-        this._btnState = state;
-        this.$watch.disabled = state !== 'ready';
+        const st = this.phase === 'AD' ? 'playing' : ads.statusOf('stars');   // ready | loading | failed | playing
+        const key = st + '|' + ads.lastError;
+        if (key === this._btnState) return;
+        this._btnState = key;
+        this.$watch.disabled = st === 'loading' || st === 'playing';
         this.$watchText.textContent =
-            state === 'ready' ? 'WATCH AD' :
-            state === 'playing' ? 'AD PLAYING…' : 'LOADING AD…';
+            st === 'ready' ? 'WATCH AD' :
+            st === 'playing' ? 'AD PLAYING…' :
+            st === 'loading' ? 'LOADING AD…' : 'TAP TO RETRY';
+        // اگر دریافت تبلیغ شکست خورده، دلیلش (کد خطا) نشان داده می‌شود تا بشود عیب‌یابی کرد
+        if (st === 'failed') this.$msg.textContent = 'No ad available' + (ads.lastError ? ` (${ads.lastError})` : '');
+        else if (st === 'loading' || st === 'ready') this.$msg.textContent = '';
     }
 
     async _watch() {
-        if (this.phase !== 'OFFER' || !this.game.ads.isReady('stars')) return;
+        if (this.phase !== 'OFFER') return;
+        const ads = this.game.ads;
+        const st = ads.statusOf('stars');
+        if (st === 'loading') return;
+        if (st === 'failed') {            // تلاش دوباره
+            this._btnState = '';
+            ads.retry('stars');
+            this._render();
+            return;
+        }
 
         this.phase = 'AD';
         this.$msg.textContent = '';
         this._render();
 
-        const res = await this.game.ads.claimStars();
+        const res = await ads.claimStars();
 
         this.phase = 'OFFER';
         this._btnState = '';
@@ -102,8 +113,8 @@ export class StarsPopup {
             this.close();
             return;
         }
-        this.$msg.textContent = res.status === 'CLOSED' ? 'Watch the full ad to get stars' : 'No ad available';
         this._render();
+        if (res.status === 'CLOSED') this.$msg.textContent = 'Watch the full ad to get stars';
     }
 
     // بعد از گرفتن ستاره، صفحه‌های بازِ فروشگاه/ارتقا دوباره رسم می‌شوند تا دکمه‌ها فعال شوند

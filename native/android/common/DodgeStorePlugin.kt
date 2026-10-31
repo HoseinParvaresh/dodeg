@@ -22,6 +22,18 @@ class DodgeStorePlugin : Plugin() {
 
     private val ui = Handler(Looper.getMainLooper())
 
+    // وقتی برنامه به پس‌زمینه می‌رود (خروج، قفل گوشی، باز شدن تبلیغ) یا برمی‌گردد، به JS خبر می‌دهیم
+    // تا بازی مکث کند و موسیقی قطع شود.
+    override fun handleOnPause() {
+        super.handleOnPause()
+        notifyListeners("appState", JSObject().apply { put("active", false) })
+    }
+
+    override fun handleOnResume() {
+        super.handleOnResume()
+        notifyListeners("appState", JSObject().apply { put("active", true) })
+    }
+
     // تپسل خودش هنگام شروع برنامه با ContentProvider فعال می‌شود (مستند Quick Start)؛
     // اگر درخواست زودتر از آماده شدن برسد، سمت JS با فاصله دوباره تلاش می‌کند.
     @PluginMethod

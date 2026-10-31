@@ -15,6 +15,7 @@ game (JS) → ads.js → platform.js → Capacitor plugin "DodgeStore" (Kotlin) 
 | `adsRequest({ zoneId })` | شناسه‌ی zone تپسل | `{ adId }` (همان شناسه‌ی تبلیغ تپسل) | `NO_FILL` `ERROR` |
 | `adsShow({ adId })` | – | وقتی **تبلیغ بسته شد** resolve می‌شود: `{ rewarded: boolean, closedByUser: boolean }` | `SHOW_FAILED` `ERROR` |
 | رویداد `adOpened` | `{ adId }` | از `onAdImpression` تپسل ارسال می‌شود | – |
+| رویداد `appState` | `{ active: boolean }` | با `onPause` / `onResume` اکتیویتی ارسال می‌شود؛ بازی با آن مکث می‌کند و موسیقی را قطع می‌کند | – |
 
 ## قواعد
 - `rewarded: true` **فقط** وقتی که callback پاداش تپسل (`onRewarded`) صدا زده شده باشد. بستن تبلیغ بدون آن یعنی `rewarded: false`.

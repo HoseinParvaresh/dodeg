@@ -2,5 +2,8 @@
   "appId": "ir.hparvaresh.dodge",
   "appName": "Dodge",
   "webDir": "www",
-  "server": { "androidScheme": "https" }
+  "server": {
+    "androidScheme": "https"
+  },
+  "backgroundColor": "#121316"
 }

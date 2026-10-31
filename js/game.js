@@ -10,6 +10,8 @@ import { UIManager } from './ui.js';
 import { AdsManager } from './ads.js';
 import { ContinueScreen } from './continueScreen.js';
 import { StarsPopup } from './starsPopup.js';
+import { Platform } from './platform.js';
+import { finishIntro } from './intro.js';
 import { CONTINUE } from './config.js';
 
 // نوشتن در DOM فقط وقتی مقدار واقعاً عوض شده (هر نوشتن، حتی با مقدار یکسان، بازچینی/بازرسم دارد)
@@ -110,6 +112,10 @@ export class DodgeGame {
         this.applyThemeColors();
         this.ui.refreshHomeUI();
 
+        // وقتی برنامه به پس‌زمینه می‌رود (خروج، قفل گوشی، تماس): بازی مکث می‌کند و موسیقی قطع می‌شود
+        this.inBackground = false;
+        Platform.onAppState((active) => active ? this.onAppForeground() : this.onAppBackground());
+
         this.lastTime = performance.now();
         this.nextDue = 0;       // زمان‌بندی: حداکثر ۶۰ فریم بر ثانیه (۳۰ در منو)
         this.dtSmooth = 0;      // dt هموارشده برای جلوگیری از پرش حرکت
@@ -118,6 +124,7 @@ export class DodgeGame {
         this._perfWarm = 2;     // دو پنجره‌ی اول (شروع بازی) در نظر گرفته نمی‌شود
         this._raf = (t) => this.loop(t);
         requestAnimationFrame(this._raf);
+        finishIntro();
     }
 
     createPlayerObj(id, customColor) {
@@ -157,6 +164,23 @@ export class DodgeGame {
         const th = this.getActiveTheme();
         document.documentElement.style.setProperty('--bg', th.bg);
         document.documentElement.style.setProperty('--accent', th.laser);
+    }
+
+    onAppBackground() {
+        if (this.inBackground) return;
+        this.inBackground = true;
+        if (this.state === 'PLAYING') this.togglePause();
+        try { if (this.audio && this.audio.audioEl) this.audio.audioEl.pause(); } catch { }
+    }
+
+    onAppForeground() {
+        if (!this.inBackground) return;
+        this.inBackground = false;
+        this.lastTime = performance.now();
+        this.nextDue = 0;
+        this.dtSmooth = 0;
+        if (this.audio) this.audio.syncMusic();
+        if (this.ads) this.ads._prepareAll();
     }
 
     // فقط اندازه‌ی پیکسلی بوم را عوض می‌کند (بدون دست زدن به محل آرنا یا بازیکن)
@@ -1075,6 +1099,7 @@ export class DodgeGame {
 
     loop(now) {
         requestAnimationFrame(this._raf);
+        if (this.inBackground) { this.lastTime = now; return; }   // در پس‌زمینه هیچ کاری نمی‌کنیم
 
         // ۱) سقف فریم‌ریت: روی صفحه‌های ۹۰/۱۲۰ هرتز هم بیشتر از ~۶۰ فریم رسم نمی‌کنیم (منو: ۳۰)
         const frameMs = this.state === 'MENU' ? 33.2 : 16.0;

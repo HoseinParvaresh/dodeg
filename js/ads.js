@@ -11,15 +11,21 @@ import { LEVELS } from './levels.js';
 // نتیجه‌ی show():  { status: 'REWARDED' | 'CLOSED' | 'ERROR' | 'NOT_READY' | 'BUSY' | 'UNSUPPORTED' }
 
 const PLACEMENTS = ['continue', 'stars', 'unlockAll'];
+// فاصله‌ی تلاش‌های مجدد بعد از شکست؛ بعد از آخرین عدد هر ۲۰ ثانیه تکرار می‌شود
+const RETRY_STEPS_MS = [3000, 6000, 12000, 20000];
 
+// نکته‌ی مهم: تبلیغ‌ها بر اساس «zone» نگه‌داری می‌شوند نه بر اساس جایگاه (continue / stars / unlockAll).
+// اگر چند جایگاه یک zone مشترک داشته باشند (مثل zone تست)، فقط یک درخواست می‌رود و هر جایگاهی
+// که اول نیاز داشت از همان تبلیغ استفاده می‌کند. (تپسل به درخواست‌های هم‌زمانِ یک zone ممکن است جواب ندهد.)
 export class AdsManager {
     constructor(game) {
         this.game = game;
         this.inited = false;
         this.busy = false;                    // الان تبلیغی در حال نمایش است
-        this.cache = {};                      // placement → { adId, ts } | { loading: true }
-        this.fails = {};                      // placement → تعداد شکست پشت‌سرهم
+        this.pool = {};                       // zoneId → { adId, ts } | { loading: true, token }
+        this.fails = {};                      // zoneId → تعداد شکست پشت‌سرهم
         this.timers = {};
+        this.lastError = '';                  // آخرین کد خطای درخواست (برای نشان دادن به بازیکن/عیب‌یابی)
         this.listeners = new Set();
         this.init();
     }
@@ -41,10 +47,12 @@ export class AdsManager {
             console.warn('[ads] init failed:', e.code, e.message);
             return;
         }
-        PLACEMENTS.forEach(p => this.prepare(p));
+        this._prepareAll();
         // تبلیغ آماده‌ی قدیمی را تازه می‌کند
-        setInterval(() => PLACEMENTS.forEach(p => this.prepare(p)), 30000);
+        setInterval(() => this._prepareAll(), 30000);
     }
+
+    zoneOf(p) { return ADS.zones[p]; }
 
     // آیا این placement الان به تبلیغ آماده نیاز دارد؟
     _wanted(p) {
@@ -52,32 +60,69 @@ export class AdsManager {
         return true;
     }
 
+    _prepareAll() {
+        new Set(PLACEMENTS.filter(p => this._wanted(p)).map(p => this.zoneOf(p))).forEach(z => this._prepareZone(z));
+    }
+
     isReady(p) {
-        const c = this.cache[p];
+        const c = this.pool[this.zoneOf(p)];
         return !!(c && c.adId && Date.now() - c.ts < ADS.cacheTtlMs);
     }
 
-    isLoading(p) { return !!(this.cache[p] && this.cache[p].loading); }
+    isLoading(p) {
+        const c = this.pool[this.zoneOf(p)];
+        return !!(c && c.loading);
+    }
 
-    async prepare(p) {
-        if (!this.inited || this.busy || !this._wanted(p)) return;
-        if (this.isReady(p) || this.isLoading(p)) return;
+    // 'ready' | 'loading' | 'failed' — برای نشان دادن وضعیت دکمه‌ها
+    statusOf(p) {
+        if (this.isReady(p)) return 'ready';
+        if (this.isLoading(p)) return 'loading';
+        return 'failed';
+    }
 
-        this.cache[p] = { loading: true };
+    prepare(p) { return this._prepareZone(this.zoneOf(p)); }
+
+    // تلاش فوری دوباره (مثلاً وقتی بازیکن روی «TAP TO RETRY» می‌زند)
+    retry(p) {
+        const z = this.zoneOf(p);
+        clearTimeout(this.timers[z]);
+        return this._prepareZone(z);
+    }
+
+    async _prepareZone(zone) {
+        if (!this.inited || this.busy) return;
+        const c = this.pool[zone];
+        if (c && (c.loading || (c.adId && Date.now() - c.ts < ADS.cacheTtlMs))) return;
+
+        const token = {};
+        this.pool[zone] = { loading: true, token };
         this._notify();
+
+        const sim = Platform.isSim && window.__DODGE_SIM__;
+        const timeoutMs = (sim && sim.requestTimeoutMs) || ADS.requestTimeoutMs;
+        let timer;
+        const timeout = new Promise((_, reject) => {
+            timer = setTimeout(() => reject(Object.assign(new Error('request timeout'), { code: 'TIMEOUT' })), timeoutMs);
+        });
+
         try {
-            const r = await Platform.ads.request(ADS.zones[p]);
+            const r = await Promise.race([Platform.ads.request(zone), timeout]);
             if (!r || !r.adId) throw Object.assign(new Error('empty adId'), { code: 'NO_FILL' });
-            this.cache[p] = { adId: r.adId, ts: Date.now() };
-            this.fails[p] = 0;
+            if (this.pool[zone] && this.pool[zone].token !== token) return;   // نتیجه‌ی کهنه
+            this.pool[zone] = { adId: r.adId, ts: Date.now() };
+            this.fails[zone] = 0;
+            this.lastError = '';
         } catch (e) {
-            this.cache[p] = null;
-            const n = this.fails[p] = (this.fails[p] || 0) + 1;
-            console.warn(`[ads] request(${p}) failed:`, e.code, e.message);
-            if (n <= ADS.maxRetries) {
-                clearTimeout(this.timers[p]);
-                this.timers[p] = setTimeout(() => this.prepare(p), Math.min(60000, 4000 * 2 ** (n - 1)));
-            }
+            if (this.pool[zone] && this.pool[zone].token !== token) return;
+            this.pool[zone] = null;
+            const n = this.fails[zone] = (this.fails[zone] || 0) + 1;
+            this.lastError = e.code || 'ERROR';
+            console.warn(`[ads] request(${zone}) failed:`, e.code, e.message);
+            clearTimeout(this.timers[zone]);
+            this.timers[zone] = setTimeout(() => this._prepareZone(zone), RETRY_STEPS_MS[Math.min(n - 1, RETRY_STEPS_MS.length - 1)]);
+        } finally {
+            clearTimeout(timer);
         }
         this._notify();
     }
@@ -85,10 +130,11 @@ export class AdsManager {
     async show(p) {
         if (!this.supported || !this.inited) return { status: 'UNSUPPORTED' };
         if (this.busy) return { status: 'BUSY' };
-        if (!this.isReady(p)) { this.prepare(p); return { status: 'NOT_READY' }; }
+        const zone = this.zoneOf(p);
+        if (!this.isReady(p)) { this.retry(p); return { status: 'NOT_READY' }; }
 
-        const { adId } = this.cache[p];
-        this.cache[p] = null;                 // هر تبلیغ فقط یک‌بار قابل نمایش است
+        const { adId } = this.pool[zone];
+        this.pool[zone] = null;               // هر تبلیغ فقط یک‌بار قابل نمایش است
         this.busy = true;
         this._notify();
         this._pauseAudio();
@@ -114,7 +160,7 @@ export class AdsManager {
             off();
             this.busy = false;
             this._resumeAudio();
-            setTimeout(() => this.prepare(p), 600);   // تبلیغ بعدی را از قبل می‌گیریم
+            setTimeout(() => this._prepareAll(), 600);   // تبلیغ بعدی را از قبل می‌گیریم
             this._notify();
         }
         return outcome;

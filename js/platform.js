@@ -76,17 +76,29 @@ const nativeAds = {
 const sim = window.__DODGE_SIM__ = Object.assign({
     noFill: false,        // درخواست تبلیغ با NO_FILL رد شود
     failShow: false,      // نمایش تبلیغ با خطا رد شود
-    adSeconds: 5          // طول تبلیغ
+    adSeconds: 5,         // طول تبلیغ
+    dropConcurrent: false, // درخواست هم‌زمانِ دوم برای یک zone هرگز جواب نمی‌گیرد (رفتار مشکوک تپسل)
+    hangFirst: false,     // اولین درخواست هرگز جواب نمی‌گیرد
+    requestCount: 0       // شمارنده‌ی درخواست‌ها (برای تست)
 }, window.__DODGE_SIM__ || {});
 
 let simAdSeq = 0;
+const simInflight = new Set();
 
 const simAds = {
     init: async () => { await sleep(60); return {}; },
     request: async (zoneId) => {
-        await sleep(350);
-        if (sim.noFill) throw makeError('NO_FILL', 'no fill');
-        return { adId: `simad_${++simAdSeq}_${zoneId}` };
+        sim.requestCount++;
+        if (sim.hangFirst && sim.requestCount === 1) return new Promise(() => { });
+        if (sim.dropConcurrent && simInflight.has(zoneId)) return new Promise(() => { });
+        simInflight.add(zoneId);
+        try {
+            await sleep(350);
+            if (sim.noFill) throw makeError('NO_FILL', 'no fill');
+            return { adId: `simad_${++simAdSeq}_${zoneId}` };
+        } finally {
+            simInflight.delete(zoneId);
+        }
     },
     show: (adId) => new Promise((resolve, reject) => {
         if (sim.failShow) { setTimeout(() => reject(makeError('SHOW_FAILED')), 200); return; }
@@ -130,8 +142,30 @@ const webAds = {
     onOpened: () => () => { }
 };
 
+/* ------------------------------------------------------------------ */
+/* پس‌زمینه رفتن / برگشتن برنامه (قفل گوشی، خروج، عوض کردن اپ)           */
+/* ------------------------------------------------------------------ */
+const appStateListeners = new Set();
+let appStateHooked = false;
+
+function emitAppState(active) {
+    appStateListeners.forEach(fn => { try { fn(active); } catch { } });
+}
+
+function hookAppState() {
+    if (appStateHooked) return;
+    appStateHooked = true;
+    if (plugin && typeof plugin.addListener === 'function') {
+        plugin.addListener('appState', (info) => emitAppState(!!(info && info.active)));
+    }
+    document.addEventListener('visibilitychange', () => emitAppState(!document.hidden));
+    window.addEventListener('pagehide', () => emitAppState(false));
+}
+
 export const Platform = {
     mode,
+    // fn(active:boolean) هر وقت برنامه به پس‌زمینه رفت (false) یا برگشت (true)
+    onAppState(fn) { hookAppState(); appStateListeners.add(fn); return () => appStateListeners.delete(fn); },
     get isNative() { return mode === 'native'; },
     get isSim() { return mode === 'sim'; },
     get canShowAds() { return mode !== 'web'; },

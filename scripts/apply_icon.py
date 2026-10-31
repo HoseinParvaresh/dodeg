@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""آیکن و صفحه‌ی شروع (splash) برنامه را داخل پروژه‌ی اندروید Capacitor می‌گذارد.
+"""آیکن و splash برنامه را داخل پروژه‌ی اندروید Capacitor می‌گذارد.
 
 ورودی:
   assets/icon.png             (اجباری)  مربع، حداقل 512x512 و ترجیحاً 1024x1024
@@ -86,15 +86,27 @@ for name in ('ic_launcher.xml', 'ic_launcher_round.xml'):
         '    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>\n'
         '</adaptive-icon>\n', encoding='utf-8')
 
-# صفحه‌ی شروع: لوگوی پیش‌فرض Capacitor با پس‌زمینه‌ی تیره‌ی بازی + آیکن وسط جایگزین می‌شود
+# صفحه‌ی شروع (splash): فقط رنگ تیره‌ی بازی، بدون لوگو.
+# اسم بازی را خود بازی با انیمیشن نشان می‌دهد (صحنه‌ی ورود)، پس این‌جا چیزی نمی‌گذاریم تا تصویر «جمع‌شده» دیده نشود.
 count = 0
 for splash in RES.glob('drawable*/splash.png'):
     w, h = Image.open(splash).size
-    canvas = Image.new('RGB', (w, h), bg_rgb)
-    logo = round(min(w, h) * 0.34)
-    art = src.resize((logo, logo), Image.LANCZOS)
-    canvas.paste(art, ((w - logo) // 2, (h - logo) // 2), art)
-    canvas.save(splash)
+    Image.new('RGB', (w, h), bg_rgb).save(splash)
     count += 1
 
-print(f'✓ آیکن در {len(LEGACY)} اندازه ساخته شد (پس‌زمینه‌ی تطبیقی {bg_hex}) و {count} فایل splash جایگزین شد')
+# اندروید ۱۲ به بالا خودش یک splash سیستمی با آیکن برنامه نشان می‌دهد؛ آیکن را شفاف و پس‌زمینه را تیره می‌کنیم
+styles = RES / 'values' / 'styles.xml'
+if styles.exists():
+    import re
+    xml = styles.read_text(encoding='utf-8')
+    m = re.search(r'(<style\s+name="AppTheme\.NoActionBarLaunch"[^>]*>)(.*?)(</style>)', xml, re.S)
+    if m and 'windowSplashScreenBackground' not in m.group(2):
+        items = ('\n        <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>'
+                 '\n        <item name="windowSplashScreenAnimatedIcon">@android:color/transparent</item>\n    ')
+        xml = xml[:m.end(2)] + items + xml[m.end(2):]
+        styles.write_text(xml, encoding='utf-8')
+        print('✓ splash سیستمی اندروید ۱۲+ شفاف و تیره شد')
+    elif not m:
+        print('⚠️ استایل AppTheme.NoActionBarLaunch در styles.xml پیدا نشد؛ splash سیستمی دست‌نخورده ماند')
+
+print(f'✓ آیکن در {len(LEGACY)} اندازه ساخته شد (پس‌زمینه‌ی تطبیقی {bg_hex}) و {count} فایل splash تیره شد')

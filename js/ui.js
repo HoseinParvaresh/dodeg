@@ -77,9 +77,10 @@ export class UIManager {
         if (!btn || !g.ads) return;
         if (g.ads.isAllUnlocked()) { btn.style.display = 'none'; return; }
         btn.style.display = '';
-        const ready = !g.ads.supported || (g.ads.isReady('unlockAll') && !g.ads.busy);
-        btn.disabled = !ready;
-        btn.style.opacity = ready ? '' : '0.5';
+        // آماده: فعال | در حال گرفتن تبلیغ: غیرفعال | شکست خورده: فعال (لمس = تلاش دوباره) | نسخه‌ی وب: فعال (پیام توضیحی)
+        const st = g.ads.supported ? g.ads.statusOf('unlockAll') : 'ready';
+        btn.disabled = st === 'loading';
+        btn.style.opacity = st === 'ready' ? '' : '0.55';
         btn.textContent = 'UNLOCK ALL ▶';
         btn.title = g.ads.supported ? 'Watch a short ad to unlock every level' : '';
     }

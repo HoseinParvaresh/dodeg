@@ -8,11 +8,23 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>DODGE</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='16' fill='%23121316'/><circle cx='32' cy='32' r='16' fill='%23F3F4F6'/><line x1='8' y1='36' x2='56' y2='28' stroke='%23FF5A5F' stroke-width='5' stroke-linecap='round'/></svg>">
+    <link rel="preload" href="fonts/Outfit-Variable.ttf" as="font" type="font/ttf" crossorigin>
     <link rel="stylesheet" href="css/fonts.css">
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <div id="app">
+    <!-- صحنه‌ی ورود: اسم بازی با انیمیشن (بعد از ~۲ ثانیه یا با لمس بسته می‌شود) -->
+    <div id="intro" aria-hidden="true">
+        <div class="intro-lines"><i></i><i></i></div>
+        <div class="intro-center">
+            <div class="intro-title">
+                <span style="--i:0">D</span><span class="intro-dot" style="--i:1"></span><span style="--i:2">D</span><span style="--i:3">G</span><span style="--i:4">E</span>
+            </div>
+            <div class="intro-bar"></div>
+        </div>
+    </div>
+
     <canvas id="game-canvas"></canvas>
     <audio id="bgm-audio" src="music.mp3" loop preload="auto"></audio>
 

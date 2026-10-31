@@ -700,3 +700,46 @@ html, body {
 .stars-big svg { margin-top: 4px; }
 #stars-watch:disabled { opacity: 0.45; cursor: default; }
 #stars-close { width: 100%; }
+
+/* ===== Intro: animated game title ===== */
+#intro {
+    position: absolute; inset: 0; z-index: 200; background: var(--bg);
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+#intro.intro-out { opacity: 0; visibility: hidden; transition: opacity 0.45s ease, visibility 0s linear 0.45s; }
+.intro-center { display: flex; flex-direction: column; align-items: center; gap: 22px; }
+.intro-title {
+    display: flex; align-items: center; gap: 0.07em;
+    font-family: var(--font-display); font-weight: 800; line-height: 1;
+    font-size: clamp(46px, 17vw, 78px); letter-spacing: 0.05em; color: var(--text);
+}
+.intro-title > span {
+    display: inline-block; opacity: 0; transform: translateY(0.5em) scale(0.92);
+    animation: introLetter 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+    animation-delay: calc(0.3s + var(--i) * 0.11s);
+}
+.intro-dot {
+    position: relative; width: 0.64em; height: 0.64em; border-radius: 50%; background: var(--text);
+    margin: 0 0.03em; animation-name: introDot !important;
+}
+.intro-dot::after {
+    content: ''; position: absolute; inset: -0.12em; border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.55); opacity: 0;
+    animation: introRing 0.9s ease-out 0.85s forwards;
+}
+.intro-lines i {
+    position: absolute; top: -40px; bottom: -40px; width: 3px; opacity: 0;
+    background: repeating-linear-gradient(to bottom, var(--accent) 0 16px, transparent 16px 34px);
+    animation: introLine 1.5s ease-out 0.1s forwards;
+}
+.intro-lines i:nth-child(1) { left: 24%; }
+.intro-lines i:nth-child(2) { right: 24%; animation-delay: 0.3s; }
+.intro-bar {
+    height: 3px; width: 0; border-radius: 3px; background: var(--accent);
+    animation: introBar 0.5s ease-out 1.05s forwards;
+}
+@keyframes introLetter { to { opacity: 1; transform: none; } }
+@keyframes introDot { 0% { opacity: 0; transform: scale(0); } 60% { opacity: 1; transform: scale(1.22); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes introRing { 0% { opacity: 0.8; transform: scale(0.7); } 100% { opacity: 0; transform: scale(1.9); } }
+@keyframes introLine { 0% { opacity: 0; transform: translateY(-50px); } 35% { opacity: 0.55; } 100% { opacity: 0.18; transform: translateY(20px); } }
+@keyframes introBar { to { width: 64px; } }
