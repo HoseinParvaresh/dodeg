@@ -1,4 +1,4 @@
-import { CHAPTERS, CHAPTER_INTROS, DASH_TUTORIAL, LEVELS, ACHIEVEMENTS } from './levels.js';
+import { CHAPTERS, CHAPTER_INTROS, LEVELS, ACHIEVEMENTS } from './levels.js';
 import { SHOP_DATA, SHAPE_SVGS, FX_SVGS } from './shop.js';
 import { SaveStore } from './storage.js';
 
@@ -12,9 +12,6 @@ export class UIManager {
         this.ensureChapterIntroModal();
         this.upgradeTopBarStarPill();
         this.bindUI();
-
-        const hintEl = document.getElementById('hud-dash-hint');
-        if (hintEl) hintEl.textContent = 'DOUBLE-TAP SCREEN TO DASH';
     }
 
     setupFourthShopTab() {
@@ -68,6 +65,28 @@ export class UIManager {
 
     onAdsStateChanged() {
         this.refreshUnlockAllButton();
+        this.refreshDoubleButton();
+    }
+
+    // دکمه‌ی «دو برابر کردن ستاره‌ی مرحله با تبلیغ» زیر دکمه‌ی NEXT (فقط بعد از برد در حالت مراحل)
+    refreshDoubleButton() {
+        const g = this.game;
+        const btn = document.getElementById('btn-res-double');
+        const textEl = document.getElementById('res-double-text');
+        if (!btn || !textEl || !g.ads) return;
+        const eligible = g.lastOutcome === 'WIN' && g.mode === 'LEVEL' && g.doubleBonus > 0 && g.ads.supported;
+        btn.style.display = eligible ? 'flex' : 'none';
+        if (!eligible) return;
+        if (g.doubleClaimed) {
+            textEl.textContent = 'DOUBLED ✓';
+            btn.disabled = true;
+            btn.style.opacity = '0.6';
+            return;
+        }
+        const st = g.ads.statusOf('double');
+        btn.disabled = st === 'loading';
+        btn.style.opacity = st === 'ready' ? '' : '0.6';
+        textEl.textContent = st === 'ready' ? `WATCH AD · 2X ★ (+${g.doubleBonus})` : st === 'loading' ? 'LOADING AD…' : 'TAP TO RETRY';
     }
 
     // وضعیت دکمه‌ی UNLOCK ALL: پنهان وقتی همه باز است، غیرفعال تا آماده شدن تبلیغ
@@ -195,20 +214,9 @@ export class UIManager {
                 svg: info.svg,
                 sub: info.name,
                 desc: info.desc,
-                btnText: chapId === 1 ? 'NEXT • DASH TUTORIAL' : 'GOT IT • START'
+                btnText: 'GOT IT • START'
             }
         ];
-
-        if (chapId === 1) {
-            this.introQueue.push({
-                tag: DASH_TUTORIAL.tag,
-                title: DASH_TUTORIAL.title,
-                svg: DASH_TUTORIAL.svg,
-                sub: DASH_TUTORIAL.sub,
-                desc: DASH_TUTORIAL.desc,
-                btnText: 'GOT IT • START GAME'
-            });
-        }
 
         this.presentNextIntroSlide();
         document.getElementById('modal-chapter-intro').classList.remove('hidden');
@@ -271,6 +279,20 @@ export class UIManager {
             document.getElementById('modal-levels').classList.remove('hidden');
         });
         tap('btn-close-levels', () => document.getElementById('modal-levels').classList.add('hidden'));
+        // دو برابر کردن ستاره‌ی مرحله با تبلیغ
+        tap('btn-res-double', async () => {
+            const btn = document.getElementById('btn-res-double');
+            if (!btn || btn.disabled) return;
+            btn.disabled = true;
+            if (g.ads.statusOf('double') === 'failed') {   // تلاش دوباره برای گرفتن تبلیغ
+                g.ads.retry('double');
+                this.refreshDoubleButton();
+                return;
+            }
+            await g.ads.claimDouble();
+            this.refreshDoubleButton();
+        });
+
         // دکمه‌ی UNLOCK ALL فقط بعد از دیدن کامل یک تبلیغ کار می‌کند
         tap('btn-unlock-all', async () => {
             const btn = document.getElementById('btn-unlock-all');

@@ -10,28 +10,6 @@ export const CHAPTERS = [
 export const ELECTRIC_WALL_LEVELS = [61, 62, 63, 64, 65, 75, 85, 95];
 export const PORTAL_WALL_LEVELS = [66, 67, 68, 69, 70, 80, 90, 100];
 
-export const DASH_TUTORIAL = {
-    tag: 'MOBILE SKILL TUTORIAL',
-    title: 'PHASE DASH • DOUBLE-TAP',
-    sub: 'Double-Tap Anywhere to Teleport',
-    desc: 'Quickly tap twice anywhere on the screen to dash forward and phase safely through active lasers! Watch the blue ring around your core for cooldown.',
-    svg: `<svg viewBox="0 0 160 90" width="160" height="90">
-        <line x1="80" y1="8" x2="80" y2="82" stroke="#FF5A5F" stroke-width="10" opacity="0.35"/>
-        <line x1="80" y1="8" x2="80" y2="82" stroke="#FFFFFF" stroke-width="3.5"/>
-        <circle cx="34" cy="68" r="10" fill="none" stroke="#38BDF8" stroke-width="2">
-            <animate attributeName="r" values="4;18;4;18" keyTimes="0;0.25;0.35;0.6" dur="2s" repeatCount="indefinite"/>
-            <animate attributeName="opacity" values="1;0;1;0" keyTimes="0;0.25;0.35;0.6" dur="2s" repeatCount="indefinite"/>
-        </circle>
-        <text x="34" y="84" fill="#38BDF8" font-size="8" font-family="Outfit, sans-serif" font-weight="700" text-anchor="middle">2x TAP</text>
-        <line x1="42" y1="42" x2="118" y2="42" stroke="#38BDF8" stroke-width="5" stroke-linecap="round" stroke-dasharray="6 6">
-            <animate attributeName="opacity" values="0;0;0.85;0" keyTimes="0;0.35;0.55;0.9" dur="2s" repeatCount="indefinite"/>
-        </line>
-        <circle cx="42" cy="42" r="8" fill="#F3F4F6" stroke="#38BDF8" stroke-width="2">
-            <animate attributeName="cx" values="42;42;122;122" keyTimes="0;0.35;0.58;1" dur="2s" repeatCount="indefinite"/>
-        </circle>
-    </svg>`
-};
-
 export const CHAPTER_INTROS = {
     1: {
         name: 'Linear Laser Beams',
@@ -122,7 +100,7 @@ export const CHAPTER_INTROS = {
     },
     8: {
         name: 'Expanding Shockwave Rings',
-        desc: 'Hollow laser rings expand outward from their core. Keep your distance or Dash straight through the ring wall!',
+        desc: 'Hollow laser rings expand outward from their core. Keep your distance and slip around the ring wall!',
         svg: `<svg viewBox="0 0 150 85" width="150" height="85">
             <circle cx="75" cy="42" r="8" fill="none" stroke="#FF5A5F" stroke-width="6">
                 <animate attributeName="r" values="6;34" dur="1.7s" repeatCount="indefinite"/>
@@ -171,7 +149,7 @@ export const CHAPTER_INTROS = {
     },
     12: {
         name: 'Quantum Rift Walls',
-        desc: 'Dual laser walls close in from opposite sides of the arena. Time your Double-Tap Dash to blink past them!',
+        desc: 'Dual laser walls close in from opposite sides of the arena. Time your moves to slip past them!',
         svg: `<svg viewBox="0 0 150 85" width="150" height="85">
             <line x1="20" y1="15" x2="130" y2="15" stroke="#FF5A5F" stroke-width="5">
                 <animate attributeName="y1" values="12;42;12" dur="2s" repeatCount="indefinite"/>
@@ -246,7 +224,7 @@ export const CHAPTER_INTROS = {
     },
     17: {
         name: 'Tactical Laser Cage',
-        desc: 'Four interlocking laser beams form a box trap around your position. Escape the perimeter or Dash out before it fires!',
+        desc: 'Four interlocking laser beams form a box trap around your position. Escape the perimeter before it fires!',
         svg: `<svg viewBox="0 0 150 85" width="150" height="85">
             <rect x="47" y="16" width="56" height="52" fill="none" stroke="#FF5A5F" stroke-width="4">
                 <animate attributeName="stroke" values="#FF5A5F;#FFFFFF;#FF5A5F" dur="1.4s" repeatCount="indefinite"/>
@@ -409,18 +387,6 @@ export const ACHIEVEMENTS = [
             { goal: 500, reward: 150 },
             { goal: 1500, reward: 340 },
             { goal: 3500, reward: 750 }
-        ]
-    },
-    {
-        id: 'phaseblinker',
-        title: 'Phase Blinker',
-        descTemplate: 'Use Double-Tap Dash {goal} times in battle',
-        stat: 'dashesUsed',
-        tiers: [
-            { goal: 40, reward: 50 },
-            { goal: 150, reward: 130 },
-            { goal: 400, reward: 280 },
-            { goal: 900, reward: 600 }
         ]
     },
     {

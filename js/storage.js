@@ -23,8 +23,7 @@ export class SaveStore {
                 closeCalls: 0,
                 fastWins: 0,
                 totalPickups: 0,
-                dashesUsed: 0,
-                powerupsPicked: 0
+                    powerupsPicked: 0
             },
             awardTiers: {},
             claimedAwards: [],

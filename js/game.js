@@ -64,9 +64,6 @@ export class DodgeGame {
         this.portalRifts = [];
         this.fxBolts = [];
 
-        this.dashTimer = 0;
-        this.dashCooldown = 0;
-        this.dashMaxCooldown = 4.0;
 
         this.score = 0;
         this.targetScore = 10;
@@ -87,8 +84,8 @@ export class DodgeGame {
         this.spawnTimer = 1.0;
         this.specialSpawnTimer = 3.8;
 
-        this.pointerP1 = { id: null, active: false, x: 0, y: 0, anchorX: 0, anchorY: 0, lastTap: 0 };
-        this.pointerP2 = { id: null, active: false, x: 0, y: 0, anchorX: 0, anchorY: 0, lastTap: 0 };
+        this.pointerP1 = { id: null, active: false, x: 0, y: 0, anchorX: 0, anchorY: 0 };
+        this.pointerP2 = { id: null, active: false, x: 0, y: 0, anchorX: 0, anchorY: 0 };
         this.keys = {};
 
         // کیفیت رندر بوم: روی گوشی‌های ضعیف از ۱٫۵ شروع می‌شود و اگر فریم‌ریت پایین بود خودکار کم می‌شود
@@ -113,6 +110,10 @@ export class DodgeGame {
         this.ui.refreshHomeUI();
 
         // وقتی برنامه به پس‌زمینه می‌رود (خروج، قفل گوشی، تماس): بازی مکث می‌کند و موسیقی قطع می‌شود
+        this.doubleBonus = 0;       // ستاره‌ی همین برد (برای دکمه‌ی دو برابر کردن با تبلیغ)
+        this.doubleClaimed = false;
+        this.resultToken = 0;
+
         this.inBackground = false;
         Platform.onAppState((active) => active ? this.onAppForeground() : this.onAppBackground());
 
@@ -134,7 +135,7 @@ export class DodgeGame {
             x: 0, y: 0, vx: 0, vy: 0, radius: 11,
             angle: id === 2 ? Math.PI / 2 : -Math.PI / 2,
             shield: false, invuln: 0, trail: [], warpScale: 0,
-            dashTimer: 0, dashCooldown: 0, phaseTimer: 0, miniTimer: 0, giantTimer: 0
+            phaseTimer: 0, miniTimer: 0, giantTimer: 0
         };
     }
 
@@ -233,16 +234,6 @@ export class DodgeGame {
             if (e.code === 'Escape' && (this.state === 'PLAYING' || this.state === 'PAUSED')) {
                 this.togglePause();
             }
-            if (this.state === 'PLAYING') {
-                if (e.code === 'Space' || e.code === 'ShiftLeft') {
-                    e.preventDefault();
-                    this.triggerDash(this.player);
-                }
-                if ((e.code === 'Enter' || e.code === 'ShiftRight') && this.mode === 'VERSUS') {
-                    e.preventDefault();
-                    this.triggerDash(this.player2);
-                }
-            }
         });
 
         window.addEventListener('keyup', (e) => {
@@ -257,15 +248,9 @@ export class DodgeGame {
                 return;
             }
 
-            const now = performance.now();
             const isTopHalf = this.mode === 'VERSUS' && e.clientY < this.height / 2;
             const ptr = isTopHalf ? this.pointerP2 : this.pointerP1;
-            const targetPlayer = isTopHalf ? this.player2 : this.player;
 
-            if (this.state === 'PLAYING' && now - ptr.lastTap < 280) {
-                this.triggerDash(targetPlayer);
-            }
-            ptr.lastTap = now;
             ptr.id = e.pointerId;
             ptr.active = true;
             ptr.x = e.clientX;
@@ -306,27 +291,6 @@ export class DodgeGame {
         };
         window.addEventListener('pointerup', release);
         window.addEventListener('pointercancel', release);
-    }
-
-    triggerDash(p = this.player) {
-        if (p.dashCooldown > 0 || this.introTimer > 0) return;
-        p.dashTimer = 0.16;
-        p.dashCooldown = this.dashMaxCooldown;
-        p.invuln = Math.max(p.invuln, 0.22);
-        p.vx = Math.cos(p.angle) * 920;
-        p.vy = Math.sin(p.angle) * 920;
-
-        if (p === this.player) {
-            this.dashTimer = p.dashTimer;
-            this.dashCooldown = p.dashCooldown;
-            this.save.stats.dashesUsed = (this.save.stats.dashesUsed || 0) + 1;
-        }
-
-        const dashCol = p.id === 2 ? '#FBBF24' : '#38BDF8';
-        this.audio.playDash();
-        this.audio.vibrate(18);
-        this.rings.push({ x: p.x, y: p.y, r: 8, maxR: 75, alpha: 0.7, color: dashCol });
-        this.emitParticles(p.x, p.y, dashCol, 10);
     }
 
     triggerImpactFX(x, y, color) {
@@ -420,7 +384,7 @@ export class DodgeGame {
             lasers: [], hazards: [], pickups: [], particles: [], rings: [], portalRifts: [], fxBolts: [],
             score: 0,
             p1Wins: 0, p2Wins: 0, currentRound: 1, roundWinnerId: 1, roundTransitionTimer: 0,
-            slowTimer: 0, phaseTimer: 0, miniTimer: 0, dashTimer: 0, dashCooldown: 0,
+            slowTimer: 0, phaseTimer: 0, miniTimer: 0,
             deathTimer: 0, killerEntity: null, dyingPlayer: null,
             electricWall: { side: -1, state: 'IDLE', timer: 1.6 },
             introTimer: this.introMaxTime,
@@ -450,16 +414,15 @@ export class DodgeGame {
 
         document.getElementById('screen-home').classList.add('hidden');
         document.getElementById('hud-center').classList.add('visible');
-        document.getElementById('hud-dash-hint')?.classList.add('visible');
         document.getElementById('btn-pause').style.display = 'flex';
         document.getElementById('hud-progress-wrap').style.display =
             (mode === 'LEVEL' || mode === 'OVERDRIVE' || mode === 'CHAOS') ? 'block' : 'none';
 
-        const hintEl = document.getElementById('hud-dash-hint');
+        // راهنمای پایین صفحه فقط برای حالت دونفره لازم است
+        const hintEl = document.getElementById('hud-hint');
         if (hintEl) {
-            hintEl.textContent = mode === 'VERSUS'
-                ? 'P1: BOTTOM • P2: TOP • GRAB RED ITEMS TO SABOTAGE!'
-                : 'DOUBLE-TAP SCREEN TO DASH';
+            hintEl.textContent = 'P1: BOTTOM • P2: TOP • GRAB RED ITEMS TO SABOTAGE!';
+            hintEl.classList.toggle('visible', mode === 'VERSUS');
         }
 
         this.updateHUD();
@@ -484,7 +447,7 @@ export class DodgeGame {
             x: cx,
             y: this.mode === 'VERSUS' ? cy + 55 : cy,
             vx: 0, vy: 0, trail: [], invuln: 0.9, warpScale: 0,
-            dashTimer: 0, dashCooldown: 0, phaseTimer: 0, miniTimer: 0, giantTimer: 0,
+            phaseTimer: 0, miniTimer: 0, giantTimer: 0,
             angle: -Math.PI / 2,
             shield: hasStartShield
         });
@@ -493,7 +456,7 @@ export class DodgeGame {
             x: cx,
             y: cy - 55,
             vx: 0, vy: 0, trail: [], invuln: 0.9, warpScale: 0,
-            dashTimer: 0, dashCooldown: 0, phaseTimer: 0, miniTimer: 0, giantTimer: 0,
+            phaseTimer: 0, miniTimer: 0, giantTimer: 0,
             angle: Math.PI / 2,
             shield: hasStartShield
         });
@@ -542,7 +505,7 @@ export class DodgeGame {
         this.audio.setMusicDucking(false);
         document.getElementById('screen-home').classList.remove('hidden');
         document.getElementById('hud-center').classList.remove('visible');
-        document.getElementById('hud-dash-hint')?.classList.remove('visible');
+        document.getElementById('hud-hint')?.classList.remove('visible');
         document.getElementById('btn-pause').style.display = 'none';
         this.ui.refreshHomeUI();
     }
@@ -627,8 +590,8 @@ export class DodgeGame {
     }
 
     handlePlayerHit(th, sourceEntity = null, targetPlayer = this.player) {
-        const isInvuln = targetPlayer.invuln > 0 || targetPlayer.phaseTimer > 0 || targetPlayer.dashTimer > 0 ||
-            (targetPlayer === this.player && (this.phaseTimer > 0 || this.dashTimer > 0));
+        const isInvuln = targetPlayer.invuln > 0 || targetPlayer.phaseTimer > 0 ||
+            (targetPlayer === this.player && this.phaseTimer > 0);
         if (isInvuln || this.state === 'DYING' || this.state === 'ROUND_END') return false;
 
         if (targetPlayer.shield) {
@@ -729,6 +692,9 @@ export class DodgeGame {
         this.pointerP1.active = false;
         this.pointerP2.active = false;
         this.lastOutcome = outcome;
+        this.resultToken++;
+        this.doubleBonus = 0;
+        this.doubleClaimed = false;
         this.audio.setMusicDucking(true);
 
         const tag = document.getElementById('res-tag');
@@ -751,6 +717,7 @@ export class DodgeGame {
             this.triggerFinishFX(this.player.x, this.player.y);
             const bonus = 4 + Math.floor(this.currentLevelId * 0.7);
             this.save.stars += bonus;
+            if (this.mode === 'LEVEL') { this.doubleBonus = bonus; this.ads.prepare('double'); }
             if (!this.shieldLostThisRun) this.save.stats.noHitWins = (this.save.stats.noHitWins || 0) + 1;
             if (this.runElapsedTime < 14.0) this.save.stats.fastWins = (this.save.stats.fastWins || 0) + 1;
             if (!this.save.completedLevels.includes(this.currentLevelId)) {
@@ -780,6 +747,7 @@ export class DodgeGame {
         SaveStore.save(this.save);
         this.updateHUD();
         this.ui.refreshHomeUI();
+        this.ui.refreshDoubleButton();
         setTimeout(() => {
             if (this.state === 'OVER') document.getElementById('modal-result').classList.remove('hidden');
         }, 380);
@@ -834,7 +802,7 @@ export class DodgeGame {
     }
 
     updateSinglePlayerPhysics(p, ptr, keyCfg, dt, smooth) {
-        ['dashTimer', 'dashCooldown', 'phaseTimer', 'miniTimer', 'giantTimer', 'invuln', 'warpScale'].forEach(k => {
+        ['phaseTimer', 'miniTimer', 'giantTimer', 'invuln', 'warpScale'].forEach(k => {
             if (p[k] > 0) p[k] = Math.max(0, p[k] - dt);
         });
 
@@ -859,14 +827,11 @@ export class DodgeGame {
             ix = -ix; iy = -iy;
         }
 
-        const isDashing = p.dashTimer > 0 || (p === this.player && this.dashTimer > 0);
-        if (!isDashing) {
-            const inertia = smooth * 0.68;
-            const isMini = p.miniTimer > 0 || (p === this.player && this.miniTimer > 0);
-            const speed = p.giantTimer > 0 ? 255 : (isMini ? 375 : 315);
-            p.vx = p.vx * inertia + ix * speed * (1 - inertia);
-            p.vy = p.vy * inertia + iy * speed * (1 - inertia);
-        }
+        const inertia = smooth * 0.68;
+        const isMini = p.miniTimer > 0 || (p === this.player && this.miniTimer > 0);
+        const speed = p.giantTimer > 0 ? 255 : (isMini ? 375 : 315);
+        p.vx = p.vx * inertia + ix * speed * (1 - inertia);
+        p.vy = p.vy * inertia + iy * speed * (1 - inertia);
 
         if (this.mode === 'CHAOS' && this.activeChaosRule.id === 'GRAVITY') {
             const gdx = this.arena.x + this.arena.w / 2 - p.x;
@@ -1023,7 +988,7 @@ export class DodgeGame {
         if (this.state !== 'PLAYING') return;
 
         this.runElapsedTime += dt;
-        ['introTimer', 'slowTimer', 'phaseTimer', 'miniTimer', 'dashTimer', 'dashCooldown'].forEach(k => {
+        ['introTimer', 'slowTimer', 'phaseTimer', 'miniTimer'].forEach(k => {
             if (this[k] > 0) this[k] = Math.max(0, this[k] - dt);
         });
 

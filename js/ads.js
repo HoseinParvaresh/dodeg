@@ -10,7 +10,7 @@ import { LEVELS } from './levels.js';
 //
 // نتیجه‌ی show():  { status: 'REWARDED' | 'CLOSED' | 'ERROR' | 'NOT_READY' | 'BUSY' | 'UNSUPPORTED' }
 
-const PLACEMENTS = ['continue', 'stars', 'unlockAll'];
+const PLACEMENTS = ['continue', 'stars', 'unlockAll', 'double'];
 // فاصله‌ی تلاش‌های مجدد بعد از شکست؛ بعد از آخرین عدد هر ۲۰ ثانیه تکرار می‌شود
 const RETRY_STEPS_MS = [3000, 6000, 12000, 20000];
 
@@ -255,6 +255,39 @@ export class AdsManager {
             g.showToast(`+${STAR_AD.stars} ★`);
             g.ui.refreshHomeUI();
             if (g.state !== 'MENU') g.updateHUD();
+        }
+        return res;
+    }
+
+    /* ---------------- دو برابر کردن ستاره‌ی مرحله (بعد از برد) ---------------- */
+
+    // نتیجه: همان status های show() (یا 'INVALID' اگر الان چیزی برای دو برابر کردن نیست)
+    async claimDouble() {
+        const g = this.game;
+        if (!this.supported || g.lastOutcome !== 'WIN' || g.doubleClaimed || !(g.doubleBonus > 0)) return { status: 'INVALID' };
+
+        const token = g.resultToken;
+        const res = await this.show('double');
+
+        if (res.status === 'REWARDED') {
+            // بعد از await دوباره چک می‌کنیم تا هیچ‌وقت دو بار پاداش داده نشود
+            if (g.resultToken === token && !g.doubleClaimed) {
+                g.doubleClaimed = true;
+                g.save.stars += g.doubleBonus;
+                SaveStore.save(g.save);
+                g.audio.playWin();
+                g.audio.vibrate([30, 50, 40]);
+                const sub = document.getElementById('res-sub');
+                if (sub) sub.textContent = `Level Bonus: +${g.doubleBonus * 2} ★`;
+                g.showToast(`+${g.doubleBonus} ★`);
+                g.ui.refreshHomeUI();
+            }
+        } else if (res.status === 'CLOSED') {
+            g.showToast('WATCH THE FULL AD TO DOUBLE');
+        } else if (res.status === 'NOT_READY' || res.status === 'BUSY') {
+            g.showToast('AD NOT READY YET - TRY AGAIN IN A MOMENT');
+        } else {
+            g.showToast('AD FAILED - TRY AGAIN LATER');
         }
         return res;
     }

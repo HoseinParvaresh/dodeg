@@ -22,17 +22,6 @@ export class PlayerRenderer {
 
         if (pts.length < 2) return;
 
-        if (entity.dashTimer > 0) {
-            for (let i = 1; i < Math.min(pts.length, 8); i += 2) {
-                ctx.fillStyle = entity.id === 2 ? '#FBBF24' : '#38BDF8';
-                ctx.globalAlpha = (1 - i / 8) * 0.55;
-                ctx.beginPath();
-                ctx.arc(pts[i].x, pts[i].y, r * 1.05, 0, Math.PI * 2);
-                ctx.fill();
-            }
-            ctx.globalAlpha = 1;
-        }
-
         if (trailType === 'bolt') {
             ctx.strokeStyle = '#FBBF24';
             ctx.lineWidth = 2.2;
@@ -121,10 +110,6 @@ export class PlayerRenderer {
             ctx.stroke();
         };
 
-        if (entity.dashCooldown > 0) {
-            drawRing(r + 4, 1 - (entity.dashCooldown / g.dashMaxCooldown), 'rgba(56, 189, 248, 0.45)', 1.8);
-        }
-
         if (entity.phaseTimer > 0) {
             drawRing(r + 9, entity.phaseTimer / 4.2, '#C084FC', 2.5);
             ctx.fillStyle = 'rgba(192, 132, 252, 0.22)';
@@ -152,7 +137,7 @@ export class PlayerRenderer {
         }
 
         const baseColor = g.mode === 'VERSUS' ? entity.customColor : th.player;
-        const coreColor = entity.dashTimer > 0 ? '#FFFFFF' : (entity.phaseTimer > 0 ? '#E9D5FF' : baseColor);
+        const coreColor = entity.phaseTimer > 0 ? '#E9D5FF' : baseColor;
         ctx.fillStyle = coreColor;
         ctx.strokeStyle = coreColor;
 
